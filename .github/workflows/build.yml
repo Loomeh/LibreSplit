@@ -2,11 +2,11 @@ name: Build and Release AppImage
 
 on:
   push:
-    branches: [ appimage ]   # Trigger on push to main branch
+    branches: [ appimage ]  # Ensure it triggers on the appimage branch
   pull_request:
-    branches: [ appimage ]   # Trigger on pull request to main branch
+    branches: [ appimage ]  # Ensure it triggers on pull requests to the appimage branch
   release:
-    types: [created, published]  # Trigger on release creation or publishing
+    types: [created, published]  # Ensure it triggers on release creation or publishing
 
 jobs:
   build:
@@ -79,7 +79,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: LibreSplit.AppImage
-        path: *.AppImage
+        path: "*.AppImage"
 
     - name: Create GitHub Release
       id: create_release

@@ -1,0 +1,81 @@
+name: Build AppImage
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          gcc \
+          make \
+          pkg-config \
+          gtk+3.0 \
+          libx11-dev \
+          libjansson-dev \
+          libluajit-5.1-dev \
+          rsvg-convert \
+          xxd
+
+    - name: Build project
+      run: make
+
+    - name: Download linuxdeploy and plugins
+      run: |
+        wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+        chmod +x linuxdeploy-x86_64.AppImage
+        wget https://github.com/linuxdeploy/linuxdeploy-plugin-gtk/releases/download/continuous/linuxdeploy-plugin-gtk-x86_64.AppImage
+        chmod +x linuxdeploy-plugin-gtk-x86_64.AppImage
+
+    - name: Create AppDir structure
+      run: |
+        mkdir -p LibreSplit.AppDir/usr/bin
+        mkdir -p LibreSplit.AppDir/usr/share/applications
+        mkdir -p LibreSplit.AppDir/usr/share/icons/hicolor
+        mkdir -p LibreSplit.AppDir/usr/share/glib-2.0/schemas
+        cp libresplit LibreSplit.AppDir/usr/bin/
+        cp libresplit.desktop LibreSplit.AppDir/usr/share/applications/
+        for size in 16 22 24 32 36 48 64 72 96 128 256 512; do \
+          mkdir -p LibreSplit.AppDir/usr/share/icons/hicolor/"$$size"x"$$size"/apps ; \
+          rsvg-convert -w "$$size" -h "$$size" -f png -o LibreSplit.AppDir/usr/share/icons/hicolor/"$$size"x"$$size"/apps/libresplit.png libresplit.svg ; \
+        done
+        cp libresplit.gschema.xml LibreSplit.AppDir/usr/share/glib-2.0/schemas/
+
+    - name: Add AppRun file
+      run: |
+        echo '#!/bin/bash' > LibreSplit.AppDir/AppRun
+        echo 'HERE="$(dirname "$(readlink -f "${0}")")"' >> LibreSplit.AppDir/AppRun
+        echo 'TEMP_CACHE_DIR=$(mktemp -d)' >> LibreSplit.AppDir/AppRun
+        echo 'export GDK_PIXBUF_MODULE_FILE="${TEMP_CACHE_DIR}/loaders.cache"' >> LibreSplit.AppDir/AppRun
+        echo 'export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"' >> LibreSplit.AppDir/AppRun
+        echo 'export GDK_BACKEND=x11' >> LibreSplit.AppDir/AppRun
+        echo 'export XDG_DATA_DIRS="${HERE}/usr/share:${XDG_DATA_DIRS}"' >> LibreSplit.AppDir/AppRun
+        echo 'export GTK_THEME=Adwaita' >> LibreSplit.AppDir/AppRun
+        echo 'export ICON_THEME=Adwaita' >> LibreSplit.AppDir/AppRun
+        echo 'export GDK_PIXBUF_MODULEDIR="${HERE}/usr/lib/gdk-pixbuf-2.0/2.10.0/loaders"' >> LibreSplit.AppDir/AppRun
+        echo '"${HERE}/usr/bin/gdk-pixbuf-query-loaders" > "${GDK_PIXBUF_MODULE_FILE}"' >> LibreSplit.AppDir/AppRun
+        echo 'exec "${HERE}/usr/bin/libresplit"' >> LibreSplit.AppDir/AppRun
+        chmod +x LibreSplit.AppDir/AppRun
+
+    - name: Build AppImage
+      run: |
+        ./linuxdeploy-x86_64.AppImage --appdir LibreSplit.AppDir --output appimage
+        # Optionally add GTK plugin if needed
+        ./linuxdeploy-plugin-gtk-x86_64.AppImage --appdir LibreSplit.AppDir
+
+    - name: Upload AppImage
+      uses: actions/upload-artifact@v3
+      with:
+        name: LibreSplit.AppImage
+        path: *.AppImage

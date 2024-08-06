@@ -27,7 +27,8 @@ jobs:
           libx11-dev \
           libjansson-dev \
           libluajit-5.1-dev \
-          vim-common
+          vim-common \
+          librsvg2-bin
 
     - name: Build project
       run: make

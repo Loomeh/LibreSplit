@@ -33,7 +33,7 @@ jobs:
     - name: Build project
       run: make
 
-    - name: Download linuxdeploy and plugins
+    - name: Download linuxdeploy
       run: |
         wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
         chmod +x linuxdeploy-x86_64.AppImage
@@ -71,7 +71,6 @@ jobs:
     - name: Build AppImage
       run: |
         ./linuxdeploy-x86_64.AppImage --appdir LibreSplit.AppDir --output appimage
-        ./linuxdeploy-plugin-gtk-x86_64.AppImage --appdir LibreSplit.AppDir
 
     - name: Upload AppImage as artifact
       uses: actions/upload-artifact@v3

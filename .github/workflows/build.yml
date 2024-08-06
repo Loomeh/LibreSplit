@@ -2,11 +2,11 @@ name: Build and Release AppImage
 
 on:
   push:
-    branches: [ main ]
+    branches: [ appimage ]   # Trigger on push to main branch
   pull_request:
-    branches: [ main ]
+    branches: [ appimage ]   # Trigger on pull request to main branch
   release:
-    types: [created, published]
+    types: [created, published]  # Trigger on release creation or publishing
 
 jobs:
   build:
@@ -75,15 +75,11 @@ jobs:
         ./linuxdeploy-x86_64.AppImage --appdir LibreSplit.AppDir --output appimage
         ./linuxdeploy-plugin-gtk-x86_64.AppImage --appdir LibreSplit.AppDir
 
-    - name: Upload AppImage to artifact
+    - name: Upload AppImage as artifact
       uses: actions/upload-artifact@v3
       with:
         name: LibreSplit.AppImage
         path: *.AppImage
-
-    - name: Get the version
-      id: get_version
-      run: echo "::set-output name=VERSION::$(cat version.txt)"
 
     - name: Create GitHub Release
       id: create_release
@@ -91,8 +87,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: v${{ steps.get_version.outputs.VERSION }}
-        release_name: Release ${{ steps.get_version.outputs.VERSION }}
+        tag_name: ${{ github.ref_name }}
+        release_name: Release ${{ github.ref_name }}
         draft: false
         prerelease: false
 

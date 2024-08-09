@@ -1,98 +1,39 @@
-name: Build and Release AppImage
-
-on:
-  push:
-    branches: [ appimage ]  # Ensure it triggers on the appimage branch
-  pull_request:
-    branches: [ appimage ]  # Ensure it triggers on pull requests to the appimage branch
-  release:
-    types: [created, published]  # Ensure it triggers on release creation or publishing
-
 jobs:
-  build:
+  tests:
     runs-on: ubuntu-latest
-
+    name: Build
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: "Checkout" 
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Set up dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          gcc \
-          make \
-          pkg-config \
-          libgtk-3-dev \
-          libx11-dev \
-          libjansson-dev \
-          libluajit-5.1-dev \
-          vim-common \
-          librsvg2-bin
+      - name: "Install dependencies"
+        run: |
+          sudo apt -y update
+          sudo apt -y install libgtk-3-dev libx11-dev libjansson-dev libluajit-5.1-dev
 
-    - name: Build project
-      run: make
+      - name: "Run make"
+        run: make -j
 
-    - name: Download linuxdeploy
-      run: |
-        wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-        chmod +x linuxdeploy-x86_64.AppImage
+      - name: Set Build number
+        shell: bash
+        run: echo "build_number=$(git rev-list HEAD --count)" >> $GITHUB_ENV
 
-    - name: Create AppDir structure
-      run: |
-        mkdir -p LibreSplit.AppDir/usr/bin
-        mkdir -p LibreSplit.AppDir/usr/share/applications
-        mkdir -p LibreSplit.AppDir/usr/share/icons/hicolor
-        mkdir -p LibreSplit.AppDir/usr/share/glib-2.0/schemas
-        cp libresplit LibreSplit.AppDir/usr/bin/
-        cp libresplit.desktop LibreSplit.AppDir/usr/share/applications/
-        for size in 16 22 24 32 36 48 64 72 96 128 256 512; do \
-          mkdir -p LibreSplit.AppDir/usr/share/icons/hicolor/"$$size"x"$$size"/apps ; \
-          rsvg-convert -w "$$size" -h "$$size" -f png -o LibreSplit.AppDir/usr/share/icons/hicolor/"$$size"x"$$size"/apps/libresplit.png libresplit.svg ; \
-        done
-        cp libresplit.gschema.xml LibreSplit.AppDir/usr/share/glib-2.0/schemas/
+      - name: Compute git short sha
+        shell: bash
+        run: echo "git_short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-    - name: Add AppRun file
-      run: |
-        echo '#!/bin/bash' > LibreSplit.AppDir/AppRun
-        echo 'HERE="$(dirname "$(readlink -f "${0}")")"' >> LibreSplit.AppDir/AppRun
-        echo 'TEMP_CACHE_DIR=$(mktemp -d)' >> LibreSplit.AppDir/AppRun
-        echo 'export GDK_PIXBUF_MODULE_FILE="${TEMP_CACHE_DIR}/loaders.cache"' >> LibreSplit.AppDir/AppRun
-        echo 'export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"' >> LibreSplit.AppDir/AppRun
-        echo 'export GDK_BACKEND=x11' >> LibreSplit.AppDir/AppRun
-        echo 'export XDG_DATA_DIRS="${HERE}/usr/share:${XDG_DATA_DIRS}"' >> LibreSplit.AppDir/AppRun
-        echo 'export GTK_THEME=Adwaita' >> LibreSplit.AppDir/AppRun
-        echo 'export ICON_THEME=Adwaita' >> LibreSplit.AppDir/AppRun
-        echo 'export GDK_PIXBUF_MODULEDIR="${HERE}/usr/lib/gdk-pixbuf-2.0/2.10.0/loaders"' >> LibreSplit.AppDir/AppRun
-        echo '"${HERE}/usr/bin/gdk-pixbuf-query-loaders" > "${GDK_PIXBUF_MODULE_FILE}"' >> LibreSplit.AppDir/AppRun
-        echo 'exec "${HERE}/usr/bin/libresplit"' >> LibreSplit.AppDir/AppRun
-        chmod +x LibreSplit.AppDir/AppRun
-
-    - name: Build AppImage
-      run: |
-        ./linuxdeploy-x86_64.AppImage --appdir LibreSplit.AppDir --output appimage
-
-    - name: Upload AppImage as artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: LibreSplit.AppImage
-        path: "*.AppImage"
-
-    - name: Create GitHub Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref_name }}
-        release_name: Release ${{ github.ref_name }}
-        draft: false
-        prerelease: false
-
-    - name: Upload AppImage to Release
-      uses: actions/upload-release-asset@v1
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./*.AppImage
-        asset_name: LibreSplit.AppImage
-        asset_content_type: application/octet-stream
+      - name: "Prepare AppDir"
+        run: |
+          mkdir -p LibreSplit.AppDir/usr/bin
+          mkdir -p LibreSplit.AppDir/usr/share/applications
+          mkdir -p LibreSplit.AppDir/usr/share/icons/hicolor
+          mkdir -p LibreSplit.AppDir/usr/share/glib-2.0/schemas
+          cp libresplit LibreSplit.AppDir/usr/bin/
+          cp libresplit.desktop LibreSplit.AppDir/usr/share/applications/
+          for size in 16 22 24 32 36 48 64 72 96 128 256 512; do
+            mkdir -p LibreSplit.AppDir/usr/share/icons/hicolor/"${size}x${size}"/apps
+            rsvg-convert -w "$size" -h "$size" -f png -o LibreSplit.AppDir/usr/share/icons/hicolor/"${size}x${size}"/apps/libresplit.png libresplit.svg
+          done
+          cp libresplit.gschema.xml LibreSplit.AppDir/usr/share/glib-2.0/schemas/
